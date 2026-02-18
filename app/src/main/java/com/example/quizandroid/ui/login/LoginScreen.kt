@@ -30,7 +30,6 @@ import com.example.quizandroid.ui.theme.Laranja
 import com.google.firebase.auth.FirebaseAuth
 
 
-
 @Composable
 fun LoginScreen(
     onLoginSuccess: () -> Unit,
@@ -74,7 +73,8 @@ fun LoginScreen(
             auth.sendPasswordResetEmail(email)
                 .addOnCompleteListener { task ->
                     if (task.isSuccessful) {
-                        Toast.makeText(context, "Link enviado para $email", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, "Link enviado para $email", Toast.LENGTH_LONG)
+                            .show()
                     } else {
                         val errorMsg = translateFirebaseError(task.exception)
                         Toast.makeText(context, errorMsg, Toast.LENGTH_LONG).show()
@@ -147,9 +147,16 @@ fun LoginScreen(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    leadingIcon = { Icon(Icons.Default.Lock, null, tint = Laranja) }, // Ícone Laranja
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.Lock,
+                            null,
+                            tint = Laranja
+                        )
+                    }, // Ícone Laranja
                     trailingIcon = {
-                        val image = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
+                        val image =
+                            if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
                         IconButton(onClick = { passwordVisible = !passwordVisible }) {
                             Icon(imageVector = image, contentDescription = null, tint = Color.Gray)
                         }
@@ -185,7 +192,9 @@ fun LoginScreen(
                     Button(
                         onClick = { performLogin() },
                         enabled = canSubmit,
-                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (canSubmit) Laranja else Color.Gray, // Botão Laranja

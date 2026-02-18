@@ -34,7 +34,6 @@ fun HomeScreen(onLogout: () -> Unit) {
     val uid = auth.currentUser?.uid ?: ""
 
     // 2. Observa o Utilizador no Room em Tempo Real
-    // O collectAsState transforma o Flow do Room em um estado do Compose
     val userLocal by dbLocal.userDao().getUserById(uid).collectAsState(initial = null)
 
     // 3. Define o nome: Se o Room tiver dados, usa o nome. Se não, usa "Jogador".
@@ -44,7 +43,6 @@ fun HomeScreen(onLogout: () -> Unit) {
         topBar = {
             TopAppBar(
                 title = { Text("Quiz Master", color = Color.White) },
-                // Usei a sua cor Laranja para manter a identidade visual
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Laranja),
                 actions = {
                     IconButton(onClick = onLogout) {
@@ -101,7 +99,6 @@ fun ThemeCard(theme: QuizTheme) {
             .clickable { /* Futura navegação para o Quiz */ },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = theme.color.copy(alpha = 0.1f)),
-        // Adicionei um pouco de elevação para combinar com o estilo dos Cards de Login
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(

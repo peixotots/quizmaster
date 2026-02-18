@@ -4,7 +4,8 @@ import android.content.Context
 import android.content.SharedPreferences
 
 class UserPrefsManager(context: Context) {
-    private val prefs: SharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+    private val prefs: SharedPreferences =
+        context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
 
     companion object {
         private const val KEY_UID = "user_uid"

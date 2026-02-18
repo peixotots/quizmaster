@@ -107,17 +107,29 @@ fun RegisterScreen(
                                             userPrefs.saveUser(uid, email, name)
 
                                             isLoading = false
-                                            Toast.makeText(context, "Conta criada com sucesso!", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(
+                                                context,
+                                                "Conta criada com sucesso!",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
                                             onRegisterSuccess()
                                         } catch (e: Exception) {
                                             isLoading = false
-                                            Toast.makeText(context, "Erro local: ${e.message}", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(
+                                                context,
+                                                "Erro local: ${e.message}",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
                                         }
                                     }
                                 }
                                 .addOnFailureListener { e ->
                                     isLoading = false
-                                    Toast.makeText(context, "Erro ao sincronizar: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(
+                                        context,
+                                        "Erro ao sincronizar: ${e.message}",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
                                 }
                         }
                     } else {
@@ -197,7 +209,8 @@ fun RegisterScreen(
                     shape = RoundedCornerShape(16.dp),
                     leadingIcon = { Icon(Icons.Default.Lock, null, tint = Laranja) },
                     trailingIcon = {
-                        val image = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
+                        val image =
+                            if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
                         IconButton(onClick = { passwordVisible = !passwordVisible }) {
                             Icon(image, null, tint = Color.Gray)
                         }
@@ -217,7 +230,8 @@ fun RegisterScreen(
                     shape = RoundedCornerShape(16.dp),
                     leadingIcon = { Icon(Icons.Default.Lock, null, tint = Laranja) },
                     trailingIcon = {
-                        val image = if (confirmPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
+                        val image =
+                            if (confirmPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
                         IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
                             Icon(image, null, tint = Color.Gray)
                         }
@@ -241,7 +255,9 @@ fun RegisterScreen(
                     Button(
                         onClick = { performRegister() },
                         enabled = isFormValid,
-                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (isFormValid) Laranja else Color.Gray,
