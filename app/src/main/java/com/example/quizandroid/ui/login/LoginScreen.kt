@@ -28,7 +28,7 @@ import com.example.quizandroid.data.model.UserPrefsManager
 import com.example.quizandroid.translateFirebaseError
 import com.example.quizandroid.ui.theme.Laranja
 import com.google.firebase.auth.FirebaseAuth
-
+import com.google.firebase.firestore.FirebaseFirestore // Importação nova!
 
 @Composable
 fun LoginScreen(
@@ -41,6 +41,7 @@ fun LoginScreen(
     var passwordVisible by remember { mutableStateOf(false) }
 
     val auth = FirebaseAuth.getInstance()
+    val db = FirebaseFirestore.getInstance() // Nova instância do banco!
     val context = LocalContext.current
     val userPrefs = UserPrefsManager(context)
 
@@ -53,14 +54,30 @@ fun LoginScreen(
             isLoading = true
             auth.signInWithEmailAndPassword(email, password)
                 .addOnCompleteListener { task ->
-                    isLoading = false
                     if (task.isSuccessful) {
                         val firebaseUser = auth.currentUser
-                        firebaseUser?.let {
-                            userPrefs.saveUser(it.uid, email, "Usuário")
+                        firebaseUser?.let { user ->
+                            // VAI NO FIRESTORE BUSCAR O NOME REAL DO USUÁRIO!
+                            db.collection("users").document(user.uid).get()
+                                .addOnSuccessListener { document ->
+                                    // Pega o nome do banco, ou "Jogador" se por acaso não achar
+                                    val realName = document.getString("name") ?: "Jogador"
+
+                                    // Agora sim salva o nome certo no celular!
+                                    userPrefs.saveUser(user.uid, email, realName)
+
+                                    isLoading = false
+                                    onLoginSuccess()
+                                }
+                                .addOnFailureListener {
+                                    // Se a internet falhar bem nessa hora, loga com um genérico
+                                    userPrefs.saveUser(user.uid, email, "Jogador")
+                                    isLoading = false
+                                    onLoginSuccess()
+                                }
                         }
-                        onLoginSuccess()
                     } else {
+                        isLoading = false
                         val errorMsg = translateFirebaseError(task.exception)
                         Toast.makeText(context, errorMsg, Toast.LENGTH_LONG).show()
                     }
@@ -153,7 +170,7 @@ fun LoginScreen(
                             null,
                             tint = Laranja
                         )
-                    }, // Ícone Laranja
+                    },
                     trailingIcon = {
                         val image =
                             if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
@@ -165,7 +182,7 @@ fun LoginScreen(
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = Color.Black,
                         unfocusedTextColor = Color.Black,
-                        focusedBorderColor = Laranja, // Borda Laranja
+                        focusedBorderColor = Laranja,
                         unfocusedBorderColor = Color.LightGray,
                         focusedLabelColor = Laranja
                     )
@@ -197,7 +214,7 @@ fun LoginScreen(
                             .height(56.dp),
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (canSubmit) Laranja else Color.Gray, // Botão Laranja
+                            containerColor = if (canSubmit) Laranja else Color.Gray,
                             contentColor = Color.White
                         )
                     ) {
@@ -209,7 +226,7 @@ fun LoginScreen(
                     TextButton(onClick = onNavigateToRegister) {
                         Text(
                             text = "Não tem uma conta? Cadastre-se",
-                            color = Laranja, // Link Laranja
+                            color = Laranja,
                             fontWeight = FontWeight.SemiBold
                         )
                     }

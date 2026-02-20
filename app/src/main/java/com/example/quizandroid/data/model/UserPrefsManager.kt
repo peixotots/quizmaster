@@ -21,8 +21,14 @@ class UserPrefsManager(context: Context) {
             .apply()
     }
 
+    fun getUserName(): String? {
+        return prefs.getString(KEY_NAME, "Jogador")
+    }
+
     fun getUid(): String? = prefs.getString(KEY_UID, null)
+
     fun getEmail(): String? = prefs.getString(KEY_EMAIL, null)
+
     fun getName(): String? = prefs.getString(KEY_NAME, null)
 
     fun clearUser() {

@@ -10,5 +10,5 @@ data class UserEntity(
     val email: String,
     val totalScore: Int = 0,
     val quizzesDone: Int = 0,
-    val lastSync: Long = System.currentTimeMillis()
+    val avatar: String = "👤"
 )
