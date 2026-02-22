@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.quizandroid.data.model.AppDatabase
 import com.example.quizandroid.ui.theme.Laranja
@@ -102,7 +103,9 @@ fun ThemeCard(theme: QuizTheme) {
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
-            modifier = Modifier.fillMaxSize().padding(16.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Surface(
@@ -124,3 +127,12 @@ fun ThemeCard(theme: QuizTheme) {
 }
 
 data class QuizTheme(val title: String, val icon: ImageVector, val color: Color)
+
+@Preview
+@Composable
+private fun HomeScreenPreview() {
+    MaterialTheme() {
+        HomeScreen {  }
+    }
+    
+}

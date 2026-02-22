@@ -11,8 +11,16 @@ import com.example.quizandroid.data.model.UserPrefsManager
 import com.example.quizandroid.ui.login.HomeScreen
 import com.example.quizandroid.ui.login.LoginScreen
 import com.example.quizandroid.ui.login.RegisterScreen
+import com.example.quizandroid.ui.quiz.Home_Screen
+import com.example.quizandroid.ui.quizCategory.CategoryCarousel
+import com.example.quizandroid.ui.quizCategory.CategoryCarouselScreen
+import com.example.quizandroid.ui.quizCategory.GenericQuizContent
+import com.example.quizandroid.ui.quizCategory.GenericQuizScreen
+import com.example.quizandroid.ui.quizCategory.ListScreen
 import com.example.quizandroid.ui.theme.QuizAndroidTheme
 import com.google.firebase.auth.FirebaseAuth
+
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -34,13 +42,38 @@ class MainActivity : ComponentActivity() {
                         onRegisterSuccess = { currentScreen = "home" },
                         onNavigateToRegister = { currentScreen = "login" }
                     )
-                    "home" -> HomeScreen(
-                        onLogout = {
+//                    "home" -> HomeScreen(
+//                        onLogout = {
+//                            FirebaseAuth.getInstance().signOut()
+//                            userPrefs.clearUser()
+//                            currentScreen = "login"
+//                        }
+//                    )
+                    "home" -> Home_Screen(
+                       onLogout = {
                             FirebaseAuth.getInstance().signOut()
                             userPrefs.clearUser()
                             currentScreen = "login"
+                        } ,
+                        onCategoryClick = { currentScreen = "categories" }
+                    )
+
+                    "carousel"-> CategoryCarouselScreen(
+                        onCategoryClick = {currentScreen = "categories" }
+                    )
+
+                    "categories" -> ListScreen(
+                        onBack = { currentScreen = "home" },
+                        onOpenQuiz = { /* trate quiz */
+                            currentScreen = "questao"
                         }
                     )
+
+                    "questao" -> GenericQuizScreen(
+                        category = "",
+                        onBack = { currentScreen = "categories" }
+                    )
+
                 }
             }
         }
