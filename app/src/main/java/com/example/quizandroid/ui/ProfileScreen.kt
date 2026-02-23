@@ -1,5 +1,6 @@
 package com.example.quizandroid.ui
 
+import android.content.Context
 import android.widget.Toast
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -47,17 +48,25 @@ fun ProfileScreen(
     val dbLocal = remember { AppDatabase.getDatabase(context) }
     val quizRepo = remember { QuizRepository() }
     val userPrefs = remember { UserPrefsManager(context) }
-    val uid = auth.currentUser?.uid ?: ""
+
+    // 1. Pega o ID do nosso Cofre Offline!
+    val offlineCofre = context.getSharedPreferences("BypassOffline", Context.MODE_PRIVATE)
+    val uid = auth.currentUser?.uid ?: offlineCofre.getString("uid", "") ?: ""
     val coroutineScope = rememberCoroutineScope()
 
     val userLocal by dbLocal.userDao().getUserById(uid).collectAsState(initial = null)
-    var totalQuizzesCount by remember { mutableIntStateOf(0) }
 
-    val userName = userLocal?.name ?: userPrefs.getName() ?: "Jogador"
-    val userEmail = userLocal?.email ?: auth.currentUser?.email ?: ""
-    val userScore = userLocal?.totalScore ?: 0
-    val quizzesDone = userLocal?.quizzesDone ?: 0
+    // Variáveis Blindadas para o Modo Offline
+    var totalQuizzesCount by remember { mutableIntStateOf(0) }
+    var quizzesDoneState by remember { mutableIntStateOf(0) }
+    var userScoreState by remember { mutableIntStateOf(0) }
+
+    val userName = userLocal?.name ?: userPrefs.getName() ?: offlineCofre.getString("name", "Jogador") ?: "Jogador"
+    val userEmail = userLocal?.email ?: auth.currentUser?.email ?: offlineCofre.getString("email", "") ?: ""
     val userAvatar = userLocal?.avatar ?: "👤"
+
+    val quizzesDoneRoom = userLocal?.quizzesDone ?: 0
+    val userScoreRoom = userLocal?.totalScore ?: 0
 
     var showAvatarDialog by remember { mutableStateOf(false) }
     var showEditNameDialog by remember { mutableStateOf(false) }
@@ -65,9 +74,20 @@ fun ProfileScreen(
 
     val availableAvatars = listOf("👨‍🚀", "🦸‍♂️", "🥷", "🧙‍♂️", "🕵️‍♂️", "👩‍🚀", "🦸‍♀️", "🧚‍♀️", "🧝‍♀️", "🕵️‍♀️", "🐼", "🦊")
 
-    LaunchedEffect(Unit) {
-        val allQuizzes = quizRepo.getActiveQuizzes()
-        totalQuizzesCount = maxOf(allQuizzes.size, quizzesDone)
+    // 2. A MÁGICA DOS GRÁFICOS: Lê as suas respostas do Cache e soma tudo!
+    LaunchedEffect(uid, quizzesDoneRoom, userScoreRoom) {
+        if (uid.isNotEmpty()) {
+            val allQuizzes = quizRepo.getActiveQuizzes()
+            val completedQuizzes = quizRepo.getUserCompletedQuizzes(uid) // Puxa seus 3 respondidos offline
+
+            val calculatedScore = completedQuizzes.sumOf { it.score }
+
+            // Força o gráfico a usar o maior valor, garantindo que os offline apareçam
+            userScoreState = maxOf(userScoreRoom, calculatedScore)
+            quizzesDoneState = maxOf(quizzesDoneRoom, completedQuizzes.size)
+
+            totalQuizzesCount = maxOf(allQuizzes.size, quizzesDoneState)
+        }
     }
 
     // --- DIALOG PARA EDITAR NOME ---
@@ -90,20 +110,16 @@ fun ProfileScreen(
                         if (nameToEdit.isNotBlank()) {
                             coroutineScope.launch {
                                 try {
-                                    // 1. Firebase
                                     FirebaseFirestore.getInstance().collection("users").document(uid).update("name", nameToEdit)
-                                    // 2. Room Local
-                                    userLocal?.let {
-                                        dbLocal.userDao().insertUser(it.copy(name = nameToEdit))
-                                    }
-                                    // 3. SharedPreferences (Corrigido: Passando os 3 parâmetros)
-                                    userPrefs.saveUser(uid, nameToEdit, userEmail)
+                                } catch (e: Exception) { /* Ignora se tiver offline */ }
 
-                                    showEditNameDialog = false
-                                    Toast.makeText(context, "Nome atualizado!", Toast.LENGTH_SHORT).show()
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "Erro ao atualizar.", Toast.LENGTH_SHORT).show()
-                                }
+                                try {
+                                    userLocal?.let { dbLocal.userDao().insertUser(it.copy(name = nameToEdit)) }
+                                } catch (e: Exception) { e.printStackTrace() }
+
+                                userPrefs.saveUser(uid, nameToEdit, userEmail)
+                                showEditNameDialog = false
+                                Toast.makeText(context, "Nome atualizado!", Toast.LENGTH_SHORT).show()
                             }
                         }
                     },
@@ -129,8 +145,8 @@ fun ProfileScreen(
                                 .background(if (userAvatar == avatar) Laranja.copy(alpha = 0.3f) else Color(0xFFF0F0F0))
                                 .clickable {
                                     coroutineScope.launch {
-                                        dbLocal.userDao().updateAvatar(uid, avatar)
-                                        FirebaseFirestore.getInstance().collection("users").document(uid).update("avatar", avatar)
+                                        try { dbLocal.userDao().updateAvatar(uid, avatar) } catch (e: Exception) { }
+                                        try { FirebaseFirestore.getInstance().collection("users").document(uid).update("avatar", avatar) } catch (e: Exception) { }
                                         showAvatarDialog = false
                                     }
                                 },
@@ -205,7 +221,7 @@ fun ProfileScreen(
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         PerformanceDonutChart(
-                            done = quizzesDone.toFloat(),
+                            done = quizzesDoneState.toFloat(),
                             total = if(totalQuizzesCount > 0) totalQuizzesCount.toFloat() else 1f,
                             modifier = Modifier.size(110.dp)
                         )
@@ -213,10 +229,10 @@ fun ProfileScreen(
                         Spacer(modifier = Modifier.width(24.dp))
 
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            LegendItem(Color(0xFF4CAF50), "Concluídos", quizzesDone.toString())
-                            val abertos = (totalQuizzesCount - quizzesDone).coerceAtLeast(0)
+                            LegendItem(Color(0xFF4CAF50), "Concluídos", quizzesDoneState.toString())
+                            val abertos = (totalQuizzesCount - quizzesDoneState).coerceAtLeast(0)
                             LegendItem(Laranja, "Abertos", abertos.toString())
-                            LegendItem(Color(0xFFF44336), "Erros Média", (quizzesDone * 0.2).toInt().toString())
+                            LegendItem(Color(0xFFF44336), "Erros Média", (quizzesDoneState * 0.2).toInt().toString())
                         }
                     }
                 }
@@ -225,8 +241,8 @@ fun ProfileScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                StatCard(modifier = Modifier.weight(1f), icon = Icons.Default.Stars, iconTint = Color(0xFFFFD700), value = "$userScore", label = "Pontos")
-                StatCard(modifier = Modifier.weight(1f), icon = Icons.Default.AssignmentTurnedIn, iconTint = Laranja, value = "$quizzesDone", label = "Quizzes")
+                StatCard(modifier = Modifier.weight(1f), icon = Icons.Default.Stars, iconTint = Color(0xFFFFD700), value = "$userScoreState", label = "Pontos")
+                StatCard(modifier = Modifier.weight(1f), icon = Icons.Default.AssignmentTurnedIn, iconTint = Laranja, value = "$quizzesDoneState", label = "Quizzes")
             }
 
             Spacer(modifier = Modifier.weight(1f))

@@ -1,5 +1,6 @@
 package com.example.quizandroid
 
+import android.content.Context
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -7,19 +8,25 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import com.example.quizandroid.data.model.AppDatabase
 import com.example.quizandroid.data.model.UserPrefsManager
+import com.example.quizandroid.data.remote.QuizRepository
+import com.example.quizandroid.ui.CreateQuestionsScreen
+import com.example.quizandroid.ui.CreateQuizSetupDialog
+import com.example.quizandroid.ui.PlayQuizScreen
+import com.example.quizandroid.ui.QuestionFormState
 import com.example.quizandroid.ui.login.HomeScreen
 import com.example.quizandroid.ui.login.LoginScreen
 import com.example.quizandroid.ui.login.RegisterScreen
-import com.example.quizandroid.ui.CreateQuizSetupDialog
-import com.example.quizandroid.ui.CreateQuestionsScreen
-import com.example.quizandroid.ui.QuestionFormState // <-- IMPORTAÇÃO NECESSÁRIA
-import com.example.quizandroid.ui.PlayQuizScreen
-import com.example.quizandroid.data.remote.QuizRepository
 import com.example.quizandroid.ui.theme.Laranja
 import com.example.quizandroid.ui.theme.QuizAndroidTheme
 import com.google.firebase.auth.FirebaseAuth
@@ -36,9 +43,14 @@ class MainActivity : ComponentActivity() {
                 val coroutineScope = rememberCoroutineScope()
                 val quizRepository = remember { QuizRepository() }
 
+                // Inicializa o banco local e o cofre offline
+                val dbLocal = remember { AppDatabase.getDatabase(context) }
+                val offlineCofre = context.getSharedPreferences("BypassOffline", Context.MODE_PRIVATE)
+
+                val auth = FirebaseAuth.getInstance()
                 var currentScreen by remember {
                     mutableStateOf(
-                        if (userPrefs.isUserLoggedIn() || FirebaseAuth.getInstance().currentUser != null) "home" else "login"
+                        if (userPrefs.isUserLoggedIn() || auth.currentUser != null) "home" else "login"
                     )
                 }
 
@@ -47,7 +59,6 @@ class MainActivity : ComponentActivity() {
                 var setupCount by remember { mutableIntStateOf(5) }
                 var setupAlternatives by remember { mutableIntStateOf(4) }
 
-                // --- NOVO: Variáveis para guardar os dados da edição ---
                 var editQuizId by remember { mutableStateOf<String?>(null) }
                 var editInitialQuestions by remember { mutableStateOf<List<QuestionFormState>?>(null) }
 
@@ -68,7 +79,7 @@ class MainActivity : ComponentActivity() {
                     "home" -> {
                         HomeScreen(
                             onLogout = {
-                                FirebaseAuth.getInstance().signOut()
+                                auth.signOut()
                                 userPrefs.clearUser()
                                 currentScreen = "login"
                             },
@@ -78,7 +89,6 @@ class MainActivity : ComponentActivity() {
                                 playQuizTitle = title
                                 currentScreen = "play_quiz"
                             },
-                            // --- NOVO: Busca as perguntas antigas quando o usuário clica no rascunho ---
                             onEditDraft = { id, title ->
                                 coroutineScope.launch {
                                     val questions = quizRepository.getQuestionsByQuizId(id)
@@ -108,8 +118,8 @@ class MainActivity : ComponentActivity() {
                                     setupCount = count
                                     setupTitle = title
                                     setupAlternatives = alternatives
-                                    editQuizId = null // Garante que é um quiz novo
-                                    editInitialQuestions = null // Garante que a tela vem vazia
+                                    editQuizId = null
+                                    editInitialQuestions = null
                                     showSetupDialog = false
                                     currentScreen = "create_questions"
                                 }
@@ -129,7 +139,7 @@ class MainActivity : ComponentActivity() {
                             onNavigateToHome = { currentScreen = "home" },
                             onNavigateToRanking = { currentScreen = "ranking" },
                             onLogout = {
-                                FirebaseAuth.getInstance().signOut()
+                                auth.signOut()
                                 userPrefs.clearUser()
                                 currentScreen = "login"
                             }
@@ -148,7 +158,7 @@ class MainActivity : ComponentActivity() {
                                 questionCount = setupCount,
                                 alternativesCount = setupAlternatives,
                                 quizTitle = setupTitle,
-                                initialQuestions = editInitialQuestions, // <-- Passa as perguntas preenchidas
+                                initialQuestions = editInitialQuestions,
                                 onBack = {
                                     editQuizId = null
                                     editInitialQuestions = null
@@ -156,13 +166,14 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onSave = { questionsList, finalStatus ->
                                     isPublishing = true
-                                    val currentUser = FirebaseAuth.getInstance().currentUser
-                                    val authorId = currentUser?.uid ?: ""
+
+                                    // Pega o ID com segurança offline
+                                    val authorId = auth.currentUser?.uid ?: offlineCofre.getString("uid", "") ?: ""
                                     val authorName = userPrefs.getName() ?: "Membro"
 
                                     coroutineScope.launch {
                                         val success = quizRepository.publishQuiz(
-                                            quizIdToUpdate = editQuizId, // <-- Avisa se é atualização ou novo
+                                            quizIdToUpdate = editQuizId,
                                             title = setupTitle,
                                             authorId = authorId,
                                             authorName = authorName,
@@ -174,7 +185,7 @@ class MainActivity : ComponentActivity() {
                                         if (success) {
                                             editQuizId = null
                                             editInitialQuestions = null
-                                            val msg = if(finalStatus == "rascunho") "Rascunho atualizado!" else "Publicado!"
+                                            val msg = if (finalStatus == "rascunho") "Rascunho atualizado!" else "Publicado!"
                                             Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                                             currentScreen = "home"
                                         } else {
@@ -187,25 +198,37 @@ class MainActivity : ComponentActivity() {
                     }
 
                     "play_quiz" -> {
-                        val dbLocal = remember { com.example.quizandroid.data.model.AppDatabase.getDatabase(context) }
                         val dbRemote = remember { com.google.firebase.firestore.FirebaseFirestore.getInstance() }
-                        val currentUser = FirebaseAuth.getInstance().currentUser
 
                         PlayQuizScreen(
                             quizId = playQuizId,
                             quizTitle = playQuizTitle,
                             onBack = { currentScreen = "home" },
                             onQuizFinished = { finalScore ->
-                                if (currentUser != null) {
+
+                                // Pega o ID com segurança offline!
+                                val uid = auth.currentUser?.uid ?: offlineCofre.getString("uid", "") ?: ""
+
+                                if (uid.isNotEmpty()) {
                                     coroutineScope.launch {
                                         try {
-                                            quizRepository.saveQuizAttempt(currentUser.uid, playQuizId, finalScore)
-                                            dbLocal.userDao().updateScore(currentUser.uid, finalScore)
-                                            dbRemote.collection("users").document(currentUser.uid)
-                                                .update(
-                                                    "score", com.google.firebase.firestore.FieldValue.increment(finalScore.toLong()),
-                                                    "quizzesDone", com.google.firebase.firestore.FieldValue.increment(1)
-                                                )
+                                            // Salva no cache do Firebase
+                                            quizRepository.saveQuizAttempt(uid, playQuizId, finalScore)
+
+                                            // Salva no banco local (Room)
+                                            try {
+                                                dbLocal.userDao().updateScore(uid, finalScore)
+                                            } catch (e: Exception) { e.printStackTrace() }
+
+                                            // Tenta salvar na nuvem do Firebase (fica na fila se tiver offline)
+                                            try {
+                                                dbRemote.collection("users").document(uid)
+                                                    .update(
+                                                        "score", com.google.firebase.firestore.FieldValue.increment(finalScore.toLong()),
+                                                        "quizzesDone", com.google.firebase.firestore.FieldValue.increment(1)
+                                                    )
+                                            } catch (e: Exception) { e.printStackTrace() }
+
                                             Toast.makeText(context, "Parabéns! $finalScore pontos.", Toast.LENGTH_LONG).show()
                                         } catch (e: Exception) {
                                             e.printStackTrace()

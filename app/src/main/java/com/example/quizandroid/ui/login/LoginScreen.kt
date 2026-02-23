@@ -1,5 +1,6 @@
 package com.example.quizandroid.ui.login
 
+import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
@@ -28,7 +29,7 @@ import com.example.quizandroid.data.model.UserPrefsManager
 import com.example.quizandroid.translateFirebaseError
 import com.example.quizandroid.ui.theme.Laranja
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore // Importação nova!
+import com.google.firebase.firestore.FirebaseFirestore
 
 @Composable
 fun LoginScreen(
@@ -41,9 +42,12 @@ fun LoginScreen(
     var passwordVisible by remember { mutableStateOf(false) }
 
     val auth = FirebaseAuth.getInstance()
-    val db = FirebaseFirestore.getInstance() // Nova instância do banco!
+    val db = FirebaseFirestore.getInstance()
     val context = LocalContext.current
     val userPrefs = UserPrefsManager(context)
+
+    // O Cofre Offline
+    val offlineCofre = context.getSharedPreferences("BypassOffline", Context.MODE_PRIVATE)
 
     val isEmailValid = android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()
     val isPasswordValid = password.length >= 6
@@ -52,34 +56,61 @@ fun LoginScreen(
     val performLogin = {
         if (canSubmit) {
             isLoading = true
+
+            // 1. Tenta fazer o login normal no servidor
             auth.signInWithEmailAndPassword(email, password)
                 .addOnCompleteListener { task ->
                     if (task.isSuccessful) {
+                        // LOGIN COM SUCESSO (COM INTERNET)
                         val firebaseUser = auth.currentUser
                         firebaseUser?.let { user ->
-                            // VAI NO FIRESTORE BUSCAR O NOME REAL DO USUÁRIO!
                             db.collection("users").document(user.uid).get()
                                 .addOnSuccessListener { document ->
-                                    // Pega o nome do banco, ou "Jogador" se por acaso não achar
                                     val realName = document.getString("name") ?: "Jogador"
+                                    userPrefs.saveUser(user.uid, email, realName) // Salva no cache
 
-                                    // Agora sim salva o nome certo no celular!
-                                    userPrefs.saveUser(user.uid, email, realName)
+                                    offlineCofre.edit()
+                                        .putString("email", email)
+                                        .putString("password", password)
+                                        .putString("uid", user.uid)
+                                        .putString("name", realName)
+                                        .apply()
 
                                     isLoading = false
                                     onLoginSuccess()
                                 }
                                 .addOnFailureListener {
-                                    // Se a internet falhar bem nessa hora, loga com um genérico
                                     userPrefs.saveUser(user.uid, email, "Jogador")
+
+                                    offlineCofre.edit()
+                                        .putString("email", email)
+                                        .putString("password", password)
+                                        .putString("uid", user.uid)
+                                        .putString("name", "Jogador")
+                                        .apply()
+
                                     isLoading = false
                                     onLoginSuccess()
                                 }
                         }
                     } else {
-                        isLoading = false
-                        val errorMsg = translateFirebaseError(task.exception)
-                        Toast.makeText(context, errorMsg, Toast.LENGTH_LONG).show()
+                        // LOGIN FALHOU - MODO OFFLINE SILENCIOSO
+                        val savedEmail = offlineCofre.getString("email", "")
+                        val savedPassword = offlineCofre.getString("password", "")
+                        val savedUid = offlineCofre.getString("uid", "")
+                        val savedName = offlineCofre.getString("name", "Jogador")
+
+                        if (email.equals(savedEmail, ignoreCase = true) && password == savedPassword && !savedUid.isNullOrEmpty()) {
+                            // Deixa entrar sem avisos
+                            userPrefs.saveUser(savedUid, email, savedName!!)
+                            isLoading = false
+                            onLoginSuccess()
+                        } else {
+                            val exception = task.exception
+                            val errorMsg = translateFirebaseError(exception)
+                            isLoading = false
+                            Toast.makeText(context, errorMsg, Toast.LENGTH_LONG).show()
+                        }
                     }
                 }
         }
