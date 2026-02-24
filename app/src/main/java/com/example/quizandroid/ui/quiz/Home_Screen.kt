@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -23,6 +24,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.filled.Leaderboard
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -55,10 +57,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.quizandroid.R
-import com.example.quizandroid.data.model.AppDatabase
-import com.example.quizandroid.ui.quizCategory.CardCarrossel
+
 import com.example.quizandroid.ui.quizCategory.CategoryCarousel
 import com.example.quizandroid.ui.quizCategory.TitleCard
+import com.example.quizandroid.ui.theme.GreySystem
 import com.example.quizandroid.ui.theme.Laranja
 import com.example.quizandroid.ui.theme.LaranjaLight
 import com.google.firebase.auth.FirebaseAuth
@@ -185,7 +187,7 @@ fun Home_Screen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(20.dp, 200.dp),
+                .padding(20.dp, 200.dp, 20.dp, 10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
 //            Text(
@@ -242,6 +244,30 @@ fun Home_Screen(
 
                     }
                 )
+
+            }
+
+            item{
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp)
+                        .background(color = GreySystem,
+                            shape = RoundedCornerShape(12.dp))
+
+                ){ Column(
+                    modifier=  Modifier
+                        .padding(10.dp, 0.dp).fillMaxHeight(),
+                    verticalArrangement = Arrangement.Center,
+
+
+                ){
+                    RowCards(
+
+                    )
+                }
+
+                }
 
             }
 
