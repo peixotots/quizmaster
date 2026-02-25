@@ -19,7 +19,6 @@ class QuizRepository {
     private val db = FirebaseFirestore.getInstance()
 
     init {
-        // Garante que o disco local está ativo
         val settings = FirebaseFirestoreSettings.Builder()
             .setPersistenceEnabled(true)
             .build()
@@ -35,8 +34,9 @@ class QuizRepository {
         status: String = "ativo"
     ): Boolean {
         return try {
-            val quizRef = if (quizIdToUpdate != null) db.collection("quizzes").document(quizIdToUpdate)
-            else db.collection("quizzes").document()
+            val quizRef =
+                if (quizIdToUpdate != null) db.collection("quizzes").document(quizIdToUpdate)
+                else db.collection("quizzes").document()
 
             val quizId = quizRef.id
 
@@ -52,18 +52,17 @@ class QuizRepository {
 
             if (quizIdToUpdate == null) quizData["createdAt"] = System.currentTimeMillis()
 
-            // Removido o .await() para não travar offline. Ele salva local e sincroniza depois!
             quizRef.set(quizData, SetOptions.merge())
 
             if (quizIdToUpdate != null) {
-                // Para ler dados antigos, tenta normal, se falhar, tenta no cache
                 val oldQuestions = try {
                     db.collection("questions").whereEqualTo("quizId", quizId).get().await()
                 } catch (e: Exception) {
-                    db.collection("questions").whereEqualTo("quizId", quizId).get(Source.CACHE).await()
+                    db.collection("questions").whereEqualTo("quizId", quizId).get(Source.CACHE)
+                        .await()
                 }
                 for (doc in oldQuestions.documents) {
-                    doc.reference.delete() // Sem await para não travar
+                    doc.reference.delete()
                 }
             }
 
@@ -79,12 +78,11 @@ class QuizRepository {
                     correctAnswerIndex = state.correctAnswerIndex,
                     orderIndex = index
                 )
-                questionRef.set(question) // Salva local instantaneamente
+                questionRef.set(question)
             }
             true
         } catch (e: Exception) {
             e.printStackTrace()
-            // Retorna true offline para o app achar que deu tudo certo e avançar
             true
         }
     }
@@ -95,7 +93,6 @@ class QuizRepository {
             val allQuizzes = snapshot.toObjects(Quiz::class.java)
             allQuizzes.filter { quiz -> quiz.status == "ativo" || (quiz.status.isNullOrEmpty() && quiz.isActive) }
         } catch (e: Exception) {
-            // SE FALHAR A REDE, FORÇA A BUSCA NO CACHE OFFLINE
             try {
                 val cachedSnapshot = db.collection("quizzes").get(Source.CACHE).await()
                 val allQuizzes = cachedSnapshot.toObjects(Quiz::class.java)
@@ -127,7 +124,7 @@ class QuizRepository {
             db.collection("quizzes").document(quizId).update("status", "ativo", "isActive", true)
             true
         } catch (e: Exception) {
-            true // Aceita offline
+            true
         }
     }
 
@@ -137,9 +134,10 @@ class QuizRepository {
             val questions = snapshot.toObjects(Question::class.java)
             questions.sortedBy { it.orderIndex }
         } catch (e: Exception) {
-            // O SEGREDO DO PLAY OFFLINE: Pega as perguntas do cofre do Firebase!
             try {
-                val cachedSnapshot = db.collection("questions").whereEqualTo("quizId", quizId).get(Source.CACHE).await()
+                val cachedSnapshot =
+                    db.collection("questions").whereEqualTo("quizId", quizId).get(Source.CACHE)
+                        .await()
                 val questions = cachedSnapshot.toObjects(Question::class.java)
                 questions.sortedBy { it.orderIndex }
             } catch (e2: Exception) {
@@ -151,8 +149,8 @@ class QuizRepository {
     suspend fun saveQuizAttempt(uid: String, quizId: String, score: Int): Boolean {
         return try {
             val attempt = QuizAttempt(quizId, score)
-            // Retirei o .await() aqui. Ele grava no celular na mesma hora e joga pra nuvem quando o wi-fi voltar
-            db.collection("users").document(uid).collection("completed_quizzes").document(quizId).set(attempt)
+            db.collection("users").document(uid).collection("completed_quizzes").document(quizId)
+                .set(attempt)
             true
         } catch (e: Exception) {
             true
@@ -161,11 +159,14 @@ class QuizRepository {
 
     suspend fun getUserCompletedQuizzes(uid: String): List<QuizAttempt> {
         return try {
-            val snapshot = db.collection("users").document(uid).collection("completed_quizzes").get().await()
+            val snapshot =
+                db.collection("users").document(uid).collection("completed_quizzes").get().await()
             snapshot.toObjects(QuizAttempt::class.java)
         } catch (e: Exception) {
             try {
-                val cachedSnapshot = db.collection("users").document(uid).collection("completed_quizzes").get(Source.CACHE).await()
+                val cachedSnapshot =
+                    db.collection("users").document(uid).collection("completed_quizzes")
+                        .get(Source.CACHE).await()
                 cachedSnapshot.toObjects(QuizAttempt::class.java)
             } catch (e2: Exception) {
                 emptyList()

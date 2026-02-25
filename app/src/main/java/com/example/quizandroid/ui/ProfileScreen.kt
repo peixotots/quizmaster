@@ -8,7 +8,17 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -16,9 +26,36 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.AssignmentTurnedIn
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Stars
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,21 +86,23 @@ fun ProfileScreen(
     val quizRepo = remember { QuizRepository() }
     val userPrefs = remember { UserPrefsManager(context) }
 
-    // 1. Pega o ID do nosso Cofre Offline!
     val offlineCofre = context.getSharedPreferences("BypassOffline", Context.MODE_PRIVATE)
     val uid = auth.currentUser?.uid ?: offlineCofre.getString("uid", "") ?: ""
     val coroutineScope = rememberCoroutineScope()
 
     val userLocal by dbLocal.userDao().getUserById(uid).collectAsState(initial = null)
 
-    // Variáveis Blindadas para o Modo Offline
-    var totalQuizzesCount by remember { mutableIntStateOf(0) }
     var quizzesDoneState by remember { mutableIntStateOf(0) }
     var userScoreState by remember { mutableIntStateOf(0) }
+    var totalCorrectAnswers by remember { mutableIntStateOf(0) }
+    var totalWrongAnswers by remember { mutableIntStateOf(0) }
 
-    val userName = userLocal?.name ?: userPrefs.getName() ?: offlineCofre.getString("name", "Jogador") ?: "Jogador"
-    val userEmail = userLocal?.email ?: auth.currentUser?.email ?: offlineCofre.getString("email", "") ?: ""
-    val userAvatar = userLocal?.avatar ?: "👤"
+    val userName =
+        offlineCofre.getString("name_$uid", null) ?: userLocal?.name ?: userPrefs.getName()
+        ?: "Jogador"
+    val userEmail =
+        userLocal?.email ?: auth.currentUser?.email ?: offlineCofre.getString("email", "") ?: ""
+    val userAvatar = offlineCofre.getString("avatar_$uid", null) ?: userLocal?.avatar ?: "👤"
 
     val quizzesDoneRoom = userLocal?.quizzesDone ?: 0
     val userScoreRoom = userLocal?.totalScore ?: 0
@@ -72,25 +111,45 @@ fun ProfileScreen(
     var showEditNameDialog by remember { mutableStateOf(false) }
     var nameToEdit by remember { mutableStateOf(userName) }
 
-    val availableAvatars = listOf("👨‍🚀", "🦸‍♂️", "🥷", "🧙‍♂️", "🕵️‍♂️", "👩‍🚀", "🦸‍♀️", "🧚‍♀️", "🧝‍♀️", "🕵️‍♀️", "🐼", "🦊")
+    val availableAvatars = listOf(
+        "👨‍🚀",
+        "🦸‍♂️",
+        "🥷",
+        "🧙‍♂️",
+        "🕵️‍♂️",
+        "👩‍🚀",
+        "🦸‍♀️",
+        "🧚‍♀️",
+        "🧝‍♀️",
+        "🕵️‍♀️",
+        "🐼",
+        "🦊"
+    )
 
-    // 2. A MÁGICA DOS GRÁFICOS: Lê as suas respostas do Cache e soma tudo!
     LaunchedEffect(uid, quizzesDoneRoom, userScoreRoom) {
         if (uid.isNotEmpty()) {
-            val allQuizzes = quizRepo.getActiveQuizzes()
-            val completedQuizzes = quizRepo.getUserCompletedQuizzes(uid) // Puxa seus 3 respondidos offline
+            val allQuizzesMap = quizRepo.getActiveQuizzes().associateBy { it.id }
+            val completedQuizzes = quizRepo.getUserCompletedQuizzes(uid)
 
-            val calculatedScore = completedQuizzes.sumOf { it.score }
+            val currentTotalScore = completedQuizzes.sumOf { it.score }
+            val currentQuizzesDone = completedQuizzes.size
+            val calculatedCorrect = currentTotalScore / 10
 
-            // Força o gráfico a usar o maior valor, garantindo que os offline apareçam
-            userScoreState = maxOf(userScoreRoom, calculatedScore)
-            quizzesDoneState = maxOf(quizzesDoneRoom, completedQuizzes.size)
+            var totalQuestionsFaced = 0
+            completedQuizzes.forEach { attempt ->
+                val quizDefinition = allQuizzesMap[attempt.quizId]
+                totalQuestionsFaced += quizDefinition?.questionCount ?: 0
+            }
 
-            totalQuizzesCount = maxOf(allQuizzes.size, quizzesDoneState)
+            val calculatedWrong = totalQuestionsFaced - calculatedCorrect
+
+            userScoreState = maxOf(userScoreRoom, currentTotalScore)
+            quizzesDoneState = maxOf(quizzesDoneRoom, currentQuizzesDone)
+            totalCorrectAnswers = calculatedCorrect
+            totalWrongAnswers = calculatedWrong
         }
     }
 
-    // --- DIALOG PARA EDITAR NOME ---
     if (showEditNameDialog) {
         AlertDialog(
             onDismissRequest = { showEditNameDialog = false },
@@ -109,17 +168,24 @@ fun ProfileScreen(
                     onClick = {
                         if (nameToEdit.isNotBlank()) {
                             coroutineScope.launch {
+                                offlineCofre.edit().putString("name_$uid", nameToEdit).apply()
                                 try {
-                                    FirebaseFirestore.getInstance().collection("users").document(uid).update("name", nameToEdit)
-                                } catch (e: Exception) { /* Ignora se tiver offline */ }
-
+                                    userLocal?.let {
+                                        dbLocal.userDao().insertUser(it.copy(name = nameToEdit))
+                                    }
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
                                 try {
-                                    userLocal?.let { dbLocal.userDao().insertUser(it.copy(name = nameToEdit)) }
-                                } catch (e: Exception) { e.printStackTrace() }
+                                    FirebaseFirestore.getInstance().collection("users")
+                                        .document(uid).update("name", nameToEdit)
+                                } catch (e: Exception) {
+                                }
 
                                 userPrefs.saveUser(uid, nameToEdit, userEmail)
                                 showEditNameDialog = false
-                                Toast.makeText(context, "Nome atualizado!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Nome atualizado!", Toast.LENGTH_SHORT)
+                                    .show()
                             }
                         }
                     },
@@ -127,26 +193,53 @@ fun ProfileScreen(
                 ) { Text("Salvar") }
             },
             dismissButton = {
-                TextButton(onClick = { showEditNameDialog = false }) { Text("Cancelar", color = Color.Gray) }
+                TextButton(onClick = { showEditNameDialog = false }) {
+                    Text(
+                        "Cancelar",
+                        color = Color.Gray
+                    )
+                }
             }
         )
     }
 
-    // --- DIALOG PARA ESCOLHA DE AVATAR ---
     if (showAvatarDialog) {
         AlertDialog(
             onDismissRequest = { showAvatarDialog = false },
             title = { Text("Escolha seu Avatar", fontWeight = FontWeight.Bold) },
             text = {
-                LazyVerticalGrid(columns = GridCells.Fixed(3), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(3),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
                     items(availableAvatars) { avatar ->
                         Box(
-                            modifier = Modifier.size(60.dp).clip(CircleShape)
-                                .background(if (userAvatar == avatar) Laranja.copy(alpha = 0.3f) else Color(0xFFF0F0F0))
+                            modifier = Modifier
+                                .size(60.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (userAvatar == avatar) Laranja.copy(alpha = 0.3f) else Color(
+                                        0xFFF0F0F0
+                                    )
+                                )
                                 .clickable {
                                     coroutineScope.launch {
-                                        try { dbLocal.userDao().updateAvatar(uid, avatar) } catch (e: Exception) { }
-                                        try { FirebaseFirestore.getInstance().collection("users").document(uid).update("avatar", avatar) } catch (e: Exception) { }
+                                        offlineCofre.edit().putString("avatar_$uid", avatar).apply()
+                                        try {
+                                            userLocal?.let {
+                                                dbLocal.userDao()
+                                                    .insertUser(it.copy(avatar = avatar))
+                                            }
+                                        } catch (e: Exception) {
+                                            e.printStackTrace()
+                                        }
+                                        try {
+                                            FirebaseFirestore.getInstance().collection("users")
+                                                .document(uid).update("avatar", avatar)
+                                        } catch (e: Exception) {
+                                        }
+
                                         showAvatarDialog = false
                                     }
                                 },
@@ -155,7 +248,14 @@ fun ProfileScreen(
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { showAvatarDialog = false }) { Text("Cancelar", color = Color.Gray) } }
+            confirmButton = {
+                TextButton(onClick = { showAvatarDialog = false }) {
+                    Text(
+                        "Cancelar",
+                        color = Color.Gray
+                    )
+                }
+            }
         )
     }
 
@@ -163,29 +263,75 @@ fun ProfileScreen(
         containerColor = Color(0xFFF8F9FE),
         bottomBar = {
             NavigationBar(containerColor = Color.White) {
-                NavigationBarItem(icon = { Icon(Icons.Default.Home, null) }, selected = false, onClick = onNavigateToHome, colors = NavigationBarItemDefaults.colors(unselectedIconColor = Color.Gray))
-                NavigationBarItem(icon = { Icon(Icons.Default.EmojiEvents, null) }, selected = false, onClick = onNavigateToRanking, colors = NavigationBarItemDefaults.colors(unselectedIconColor = Color.Gray))
-                NavigationBarItem(icon = { Icon(Icons.Default.Person, null) }, selected = true, onClick = { }, colors = NavigationBarItemDefaults.colors(selectedIconColor = Laranja))
+                val navColors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = Color.White,
+                    indicatorColor = Laranja,
+                    unselectedIconColor = Color.Gray
+                )
+
+                NavigationBarItem(
+                    icon = { Icon(Icons.Default.Home, null) },
+                    selected = false,
+                    onClick = onNavigateToHome,
+                    colors = navColors
+                )
+                NavigationBarItem(
+                    icon = { Icon(Icons.Default.EmojiEvents, null) },
+                    selected = false,
+                    onClick = onNavigateToRanking,
+                    colors = navColors
+                )
+                NavigationBarItem(
+                    icon = { Icon(Icons.Default.Person, null) },
+                    selected = true,
+                    onClick = { },
+                    colors = navColors
+                )
             }
         }
     ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(modifier = Modifier.height(32.dp))
 
             Box(contentAlignment = Alignment.BottomEnd) {
                 Box(
-                    modifier = Modifier.size(100.dp).clip(CircleShape).background(Color(0xFFF0F0F0))
+                    modifier = Modifier
+                        .size(100.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFF0F0F0))
                         .border(2.dp, Laranja.copy(alpha = 0.5f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (userAvatar == "👤") Text(userName.take(1).uppercase(), fontSize = 40.sp, fontWeight = FontWeight.Bold, color = Color.DarkGray)
+                    if (userAvatar == "👤") Text(
+                        userName.take(1).uppercase(),
+                        fontSize = 40.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.DarkGray
+                    )
                     else Text(userAvatar, fontSize = 56.sp)
                 }
-                Surface(shape = CircleShape, color = Laranja, modifier = Modifier.size(32.dp).clickable { showAvatarDialog = true }, shadowElevation = 2.dp) {
-                    Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.PhotoCamera, null, tint = Color.White, modifier = Modifier.size(16.dp)) }
+                Surface(
+                    shape = CircleShape,
+                    color = Laranja,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clickable { showAvatarDialog = true },
+                    shadowElevation = 2.dp
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Default.PhotoCamera,
+                            null,
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
             }
 
@@ -198,10 +344,12 @@ fun ProfileScreen(
                     Icons.Default.Edit,
                     contentDescription = "Editar Nome",
                     tint = Color.Gray,
-                    modifier = Modifier.size(18.dp).clickable {
-                        nameToEdit = userName
-                        showEditNameDialog = true
-                    }
+                    modifier = Modifier
+                        .size(18.dp)
+                        .clickable {
+                            nameToEdit = userName
+                            showEditNameDialog = true
+                        }
                 )
             }
 
@@ -216,23 +364,31 @@ fun ProfileScreen(
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
-                    Text("Meu Desempenho", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text("Meu Desempenho Geral", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     Spacer(modifier = Modifier.height(24.dp))
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        val totalQuestions = totalCorrectAnswers + totalWrongAnswers
                         PerformanceDonutChart(
-                            done = quizzesDoneState.toFloat(),
-                            total = if(totalQuizzesCount > 0) totalQuizzesCount.toFloat() else 1f,
+                            done = totalCorrectAnswers.toFloat(),
+                            total = if (totalQuestions > 0) totalQuestions.toFloat() else 1f,
                             modifier = Modifier.size(110.dp)
                         )
 
                         Spacer(modifier = Modifier.width(24.dp))
 
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            LegendItem(Color(0xFF4CAF50), "Concluídos", quizzesDoneState.toString())
-                            val abertos = (totalQuizzesCount - quizzesDoneState).coerceAtLeast(0)
-                            LegendItem(Laranja, "Abertos", abertos.toString())
-                            LegendItem(Color(0xFFF44336), "Erros Média", (quizzesDoneState * 0.2).toInt().toString())
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            LegendItem(
+                                Color(0xFF4CAF50),
+                                "Acertos Totais",
+                                totalCorrectAnswers.toString()
+                            )
+                            LegendItem(
+                                Color(0xFFF44336),
+                                "Erros Totais",
+                                totalWrongAnswers.toString()
+                            )
+                            LegendItem(Color.Gray, "Quizzes Feitos", quizzesDoneState.toString())
                         }
                     }
                 }
@@ -241,17 +397,34 @@ fun ProfileScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                StatCard(modifier = Modifier.weight(1f), icon = Icons.Default.Stars, iconTint = Color(0xFFFFD700), value = "$userScoreState", label = "Pontos")
-                StatCard(modifier = Modifier.weight(1f), icon = Icons.Default.AssignmentTurnedIn, iconTint = Laranja, value = "$quizzesDoneState", label = "Quizzes")
+                StatCard(
+                    modifier = Modifier.weight(1f),
+                    icon = Icons.Default.Stars,
+                    iconTint = Color(0xFFFFD700),
+                    value = "$userScoreState",
+                    label = "Pontos"
+                )
+                StatCard(
+                    modifier = Modifier.weight(1f),
+                    icon = Icons.Default.AssignmentTurnedIn,
+                    iconTint = Laranja,
+                    value = "$quizzesDoneState",
+                    label = "Quizzes"
+                )
             }
 
             Spacer(modifier = Modifier.weight(1f))
 
             Button(
                 onClick = onLogout,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFF0F0), contentColor = Color.Red),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFFFF0F0),
+                    contentColor = Color.Red
+                ),
                 shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth().height(56.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
             ) {
                 Icon(Icons.AutoMirrored.Filled.ExitToApp, null)
                 Spacer(modifier = Modifier.width(8.dp))
@@ -262,20 +435,35 @@ fun ProfileScreen(
     }
 }
 
-// --- COMPONENTES AUXILIARES ---
-
 @Composable
-fun StatCard(modifier: Modifier = Modifier, icon: androidx.compose.ui.graphics.vector.ImageVector, iconTint: Color, value: String, label: String) {
+fun StatCard(
+    modifier: Modifier = Modifier,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconTint: Color,
+    value: String,
+    label: String
+) {
     Card(
         modifier = modifier.height(100.dp),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(28.dp))
             Spacer(modifier = Modifier.height(8.dp))
-            Text(text = value, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, color = Color.Black)
+            Text(
+                text = value,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 20.sp,
+                color = Color.Black
+            )
             Text(text = label, color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Medium)
         }
     }
@@ -285,7 +473,11 @@ fun StatCard(modifier: Modifier = Modifier, icon: androidx.compose.ui.graphics.v
 fun PerformanceDonutChart(done: Float, total: Float, modifier: Modifier) {
     val rawProgress = if (total > 0) done / total else 0f
     val safeProgress = rawProgress.coerceIn(0f, 1f)
-    val animatedProgress by animateFloatAsState(targetValue = safeProgress, animationSpec = tween(1000), label = "")
+    val animatedProgress by animateFloatAsState(
+        targetValue = safeProgress,
+        animationSpec = tween(1000),
+        label = ""
+    )
 
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         Canvas(modifier = Modifier.fillMaxSize()) {
@@ -300,7 +492,7 @@ fun PerformanceDonutChart(done: Float, total: Float, modifier: Modifier) {
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text("${(safeProgress * 100).toInt()}%", fontWeight = FontWeight.Bold, fontSize = 20.sp)
-            Text("Foco", fontSize = 10.sp, color = Color.Gray)
+            Text("Acertos", fontSize = 10.sp, color = Color.Gray)
         }
     }
 }
@@ -308,9 +500,12 @@ fun PerformanceDonutChart(done: Float, total: Float, modifier: Modifier) {
 @Composable
 fun LegendItem(color: Color, label: String, value: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(color))
+        Box(modifier = Modifier
+            .size(10.dp)
+            .clip(CircleShape)
+            .background(color))
         Spacer(modifier = Modifier.width(8.dp))
-        Text(label, fontSize = 12.sp, color = Color.Gray, modifier = Modifier.width(80.dp))
-        Text(value, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        Text(label, fontSize = 12.sp, color = Color.Gray, modifier = Modifier.width(90.dp))
+        Text(value, fontSize = 14.sp, fontWeight = FontWeight.Bold)
     }
 }

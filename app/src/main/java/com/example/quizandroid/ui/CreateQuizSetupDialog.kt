@@ -1,10 +1,23 @@
 package com.example.quizandroid.ui
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -21,7 +34,6 @@ fun CreateQuizSetupDialog(
     var count by remember { mutableStateOf("5") }
     var alternatives by remember { mutableStateOf("4") }
 
-    // Cores padronizadas para os campos de texto
     val fieldColors = OutlinedTextFieldDefaults.colors(
         focusedTextColor = Color.Black,
         unfocusedTextColor = Color.Black,
@@ -34,8 +46,8 @@ fun CreateQuizSetupDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color.White, // <-- Força o fundo do diálogo a ser branco
-        titleContentColor = Color.Black, // <-- Força o título a ser preto
+        containerColor = Color.White,
+        titleContentColor = Color.Black,
         textContentColor = Color.Black,
         title = { Text("Configurar Novo Quiz", fontWeight = FontWeight.Bold) },
         text = {
@@ -46,11 +58,14 @@ fun CreateQuizSetupDialog(
                     label = { Text("Título do Quiz") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    singleLine = true, // <-- RESOLVE O PROBLEMA DO ENTER
+                    singleLine = true,
                     colors = fieldColors
                 )
 
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     OutlinedTextField(
                         value = count,
                         onValueChange = { if (it.all { c -> c.isDigit() }) count = it },
@@ -58,7 +73,7 @@ fun CreateQuizSetupDialog(
                         modifier = Modifier.weight(1f),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         shape = RoundedCornerShape(12.dp),
-                        singleLine = true, // <-- Impede pular linha
+                        singleLine = true,
                         colors = fieldColors
                     )
                     OutlinedTextField(
@@ -68,7 +83,7 @@ fun CreateQuizSetupDialog(
                         modifier = Modifier.weight(1f),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         shape = RoundedCornerShape(12.dp),
-                        singleLine = true, // <-- Impede pular linha
+                        singleLine = true,
                         colors = fieldColors
                     )
                 }
@@ -85,7 +100,13 @@ fun CreateQuizSetupDialog(
             ) { Text("Próximo", color = Color.White, fontWeight = FontWeight.Bold) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancelar", color = Color.Gray, fontWeight = FontWeight.Bold) }
+            TextButton(onClick = onDismiss) {
+                Text(
+                    "Cancelar",
+                    color = Color.Gray,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
     )
 }

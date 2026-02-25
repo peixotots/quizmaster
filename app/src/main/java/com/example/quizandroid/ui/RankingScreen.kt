@@ -2,7 +2,19 @@ package com.example.quizandroid.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
@@ -12,8 +24,23 @@ import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Stars
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,20 +68,20 @@ fun RankingScreen(
             .orderBy("score", Query.Direction.DESCENDING)
             .limit(50)
 
-        // Escuta também mudanças do cache (Modo Offline Seguro)
-        val listener = query.addSnapshotListener(com.google.firebase.firestore.MetadataChanges.INCLUDE) { snapshot, e ->
-            if (snapshot != null) {
-                users = snapshot.documents.mapNotNull { doc ->
-                    val name = doc.getString("name") ?: "Jogador"
-                    val score = doc.getLong("score")?.toInt() ?: 0
-                    val avatar = doc.getString("avatar") ?: "👤"
-                    RankingUser(doc.id, name, score, avatar)
+        val listener =
+            query.addSnapshotListener(com.google.firebase.firestore.MetadataChanges.INCLUDE) { snapshot, e ->
+                if (snapshot != null) {
+                    users = snapshot.documents.mapNotNull { doc ->
+                        val name = doc.getString("name") ?: "Jogador"
+                        val score = doc.getLong("score")?.toInt() ?: 0
+                        val avatar = doc.getString("avatar") ?: "👤"
+                        RankingUser(doc.id, name, score, avatar)
+                    }
+                    isLoading = false
+                } else if (e != null) {
+                    isLoading = false
                 }
-                isLoading = false
-            } else if (e != null) {
-                isLoading = false // Se não tiver nada e der erro de rede, apenas para de rodar a bolinha
             }
-        }
 
         onDispose { listener.remove() }
     }
@@ -63,23 +90,29 @@ fun RankingScreen(
         containerColor = Color(0xFFF8F9FE),
         bottomBar = {
             NavigationBar(containerColor = Color.White) {
+                val navColors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = Color.White,
+                    indicatorColor = Laranja,
+                    unselectedIconColor = Color.Gray
+                )
+
                 NavigationBarItem(
                     icon = { Icon(Icons.Default.Home, null) },
                     selected = false,
                     onClick = onNavigateToHome,
-                    colors = NavigationBarItemDefaults.colors(unselectedIconColor = Color.Gray)
+                    colors = navColors
                 )
                 NavigationBarItem(
                     icon = { Icon(Icons.Default.EmojiEvents, null) },
                     selected = true,
                     onClick = { /* Já estamos no ranking */ },
-                    colors = NavigationBarItemDefaults.colors(selectedIconColor = Laranja)
+                    colors = navColors
                 )
                 NavigationBarItem(
                     icon = { Icon(Icons.Default.Person, null) },
                     selected = false,
                     onClick = onNavigateToProfile,
-                    colors = NavigationBarItemDefaults.colors(unselectedIconColor = Color.Gray)
+                    colors = navColors
                 )
             }
         }
@@ -88,65 +121,85 @@ fun RankingScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Surface(
+                color = Laranja,
+                modifier = Modifier.fillMaxWidth(),
+                shadowElevation = 4.dp,
+                shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Ranking",
+                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                        color = Color.White
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(24.dp))
-            Text(
-                text = "Ranking",
-                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                color = Color.Black
-            )
-            Spacer(modifier = Modifier.height(32.dp))
 
-            if (isLoading) {
-                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = Laranja)
-                }
-            } else if (users.isNotEmpty()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.Bottom
-                ) {
-                    if (users.size > 1) PodiumAvatar(
-                        user = users[1],
-                        rank = 2,
-                        size = 80,
-                        color = Color(0xFFBDBDBD)
-                    )
-                    PodiumAvatar(
-                        user = users[0],
-                        rank = 1,
-                        size = 110,
-                        color = Color(0xFFFFD700),
-                        isWinner = true
-                    )
-                    if (users.size > 2) PodiumAvatar(
-                        user = users[2],
-                        rank = 3,
-                        size = 80,
-                        color = Color(0xFFCD7F32)
-                    )
-                }
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
 
-                Spacer(modifier = Modifier.height(32.dp))
-
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    contentPadding = PaddingValues(bottom = 24.dp)
-                ) {
-                    val remainingUsers =
-                        if (users.size > 3) users.subList(3, users.size) else emptyList()
-                    itemsIndexed(remainingUsers) { index, user ->
-                        val rank = index + 4
-                        RankingListItem(user = user, rank = rank)
+                if (isLoading) {
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = Laranja)
                     }
-                }
-            } else {
-                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    Text("Aguardando pontuações...", color = Color.Gray)
+                } else if (users.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.Bottom
+                    ) {
+                        if (users.size > 1) PodiumAvatar(
+                            user = users[1],
+                            rank = 2,
+                            size = 80,
+                            color = Color(0xFFBDBDBD)
+                        )
+                        PodiumAvatar(
+                            user = users[0],
+                            rank = 1,
+                            size = 110,
+                            color = Color(0xFFFFD700),
+                            isWinner = true
+                        )
+                        if (users.size > 2) PodiumAvatar(
+                            user = users[2],
+                            rank = 3,
+                            size = 80,
+                            color = Color(0xFFCD7F32)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(32.dp))
+
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        contentPadding = PaddingValues(bottom = 24.dp)
+                    ) {
+                        val remainingUsers =
+                            if (users.size > 3) users.subList(3, users.size) else emptyList()
+                        itemsIndexed(remainingUsers) { index, user ->
+                            val rank = index + 4
+                            RankingListItem(user = user, rank = rank)
+                        }
+                    }
+                } else {
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        Text("Aguardando pontuações...", color = Color.Gray)
+                    }
                 }
             }
         }

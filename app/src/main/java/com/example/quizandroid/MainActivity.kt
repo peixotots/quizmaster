@@ -43,9 +43,9 @@ class MainActivity : ComponentActivity() {
                 val coroutineScope = rememberCoroutineScope()
                 val quizRepository = remember { QuizRepository() }
 
-                // Inicializa o banco local e o cofre offline
                 val dbLocal = remember { AppDatabase.getDatabase(context) }
-                val offlineCofre = context.getSharedPreferences("BypassOffline", Context.MODE_PRIVATE)
+                val offlineCofre =
+                    context.getSharedPreferences("BypassOffline", Context.MODE_PRIVATE)
 
                 val auth = FirebaseAuth.getInstance()
                 var currentScreen by remember {
@@ -101,7 +101,8 @@ class MainActivity : ComponentActivity() {
                                     }
                                     setupTitle = title
                                     setupCount = loadedStates.size
-                                    setupAlternatives = if (loadedStates.isNotEmpty()) loadedStates[0].options.size else 4
+                                    setupAlternatives =
+                                        if (loadedStates.isNotEmpty()) loadedStates[0].options.size else 4
                                     editQuizId = id
                                     editInitialQuestions = loadedStates
                                     currentScreen = "create_questions"
@@ -150,7 +151,10 @@ class MainActivity : ComponentActivity() {
                         var isPublishing by remember { mutableStateOf(false) }
 
                         if (isPublishing) {
-                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
                                 CircularProgressIndicator(color = Laranja)
                             }
                         } else {
@@ -167,8 +171,9 @@ class MainActivity : ComponentActivity() {
                                 onSave = { questionsList, finalStatus ->
                                     isPublishing = true
 
-                                    // Pega o ID com segurança offline
-                                    val authorId = auth.currentUser?.uid ?: offlineCofre.getString("uid", "") ?: ""
+                                    val authorId =
+                                        auth.currentUser?.uid ?: offlineCofre.getString("uid", "")
+                                        ?: ""
                                     val authorName = userPrefs.getName() ?: "Membro"
 
                                     coroutineScope.launch {
@@ -185,11 +190,16 @@ class MainActivity : ComponentActivity() {
                                         if (success) {
                                             editQuizId = null
                                             editInitialQuestions = null
-                                            val msg = if (finalStatus == "rascunho") "Rascunho atualizado!" else "Publicado!"
+                                            val msg =
+                                                if (finalStatus == "rascunho") "Rascunho atualizado!" else "Publicado!"
                                             Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                                             currentScreen = "home"
                                         } else {
-                                            Toast.makeText(context, "Erro ao salvar.", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(
+                                                context,
+                                                "Erro ao salvar.",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
                                         }
                                     }
                                 }
@@ -198,7 +208,8 @@ class MainActivity : ComponentActivity() {
                     }
 
                     "play_quiz" -> {
-                        val dbRemote = remember { com.google.firebase.firestore.FirebaseFirestore.getInstance() }
+                        val dbRemote =
+                            remember { com.google.firebase.firestore.FirebaseFirestore.getInstance() }
 
                         PlayQuizScreen(
                             quizId = playQuizId,
@@ -206,30 +217,45 @@ class MainActivity : ComponentActivity() {
                             onBack = { currentScreen = "home" },
                             onQuizFinished = { finalScore ->
 
-                                // Pega o ID com segurança offline!
-                                val uid = auth.currentUser?.uid ?: offlineCofre.getString("uid", "") ?: ""
+                                val uid =
+                                    auth.currentUser?.uid ?: offlineCofre.getString("uid", "") ?: ""
 
                                 if (uid.isNotEmpty()) {
                                     coroutineScope.launch {
                                         try {
-                                            // Salva no cache do Firebase
-                                            quizRepository.saveQuizAttempt(uid, playQuizId, finalScore)
+                                            quizRepository.saveQuizAttempt(
+                                                uid,
+                                                playQuizId,
+                                                finalScore
+                                            )
 
-                                            // Salva no banco local (Room)
                                             try {
                                                 dbLocal.userDao().updateScore(uid, finalScore)
-                                            } catch (e: Exception) { e.printStackTrace() }
+                                            } catch (e: Exception) {
+                                                e.printStackTrace()
+                                            }
 
-                                            // Tenta salvar na nuvem do Firebase (fica na fila se tiver offline)
                                             try {
                                                 dbRemote.collection("users").document(uid)
                                                     .update(
-                                                        "score", com.google.firebase.firestore.FieldValue.increment(finalScore.toLong()),
-                                                        "quizzesDone", com.google.firebase.firestore.FieldValue.increment(1)
+                                                        "score",
+                                                        com.google.firebase.firestore.FieldValue.increment(
+                                                            finalScore.toLong()
+                                                        ),
+                                                        "quizzesDone",
+                                                        com.google.firebase.firestore.FieldValue.increment(
+                                                            1
+                                                        )
                                                     )
-                                            } catch (e: Exception) { e.printStackTrace() }
+                                            } catch (e: Exception) {
+                                                e.printStackTrace()
+                                            }
 
-                                            Toast.makeText(context, "Parabéns! $finalScore pontos.", Toast.LENGTH_LONG).show()
+                                            Toast.makeText(
+                                                context,
+                                                "Parabéns! $finalScore pontos.",
+                                                Toast.LENGTH_LONG
+                                            ).show()
                                         } catch (e: Exception) {
                                             e.printStackTrace()
                                         }

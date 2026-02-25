@@ -53,19 +53,17 @@ fun PlayQuizScreen(
     quizId: String,
     quizTitle: String,
     onBack: () -> Unit,
-    onQuizFinished: (Int) -> Unit // Retorna a pontuação final quando acabar
+    onQuizFinished: (Int) -> Unit
 ) {
     val repository = remember { QuizRepository() }
     var questions by remember { mutableStateOf<List<Question>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
 
-    // Mapa para guardar as respostas: Chave é o índice da pergunta, Valor é a opção escolhida
     var selectedAnswers by remember { mutableStateOf(mapOf<Int, Int>()) }
     var score by remember { mutableStateOf(0) }
 
     val coroutineScope = rememberCoroutineScope()
 
-    // Busca as perguntas ao abrir a tela
     LaunchedEffect(quizId) {
         questions = repository.getQuestionsByQuizId(quizId)
         isLoading = false
@@ -77,12 +75,14 @@ fun PlayQuizScreen(
         containerColor = backgroundColor,
         topBar = {
             TopAppBar(
-                // ADICIONAMOS A COR PRETA AQUI!
                 title = { Text(quizTitle, fontWeight = FontWeight.Bold, color = Color.Black) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        // ADICIONAMOS A COR PRETA NA SETA AQUI!
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar", tint = Color.Black)
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Voltar",
+                            tint = Color.Black
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = backgroundColor)
@@ -98,7 +98,6 @@ fun PlayQuizScreen(
                 Text("Nenhuma pergunta encontrada para este quiz.")
             }
         } else {
-            // O PagerState controla a navegação lateral
             val pagerState = rememberPagerState(pageCount = { questions.size })
 
             Column(
@@ -107,7 +106,6 @@ fun PlayQuizScreen(
                     .padding(padding)
                     .padding(horizontal = 24.dp)
             ) {
-                // --- CABEÇALHO: Progresso (Ex: Question 4/10) ---
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -123,7 +121,6 @@ fun PlayQuizScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Barra de Progresso Laranja
                 LinearProgressIndicator(
                     progress = { (pagerState.currentPage + 1).toFloat() / questions.size },
                     modifier = Modifier
@@ -136,18 +133,16 @@ fun PlayQuizScreen(
 
                 Spacer(modifier = Modifier.height(32.dp))
 
-                // --- CARROSSEL LATERAL DE PERGUNTAS ---
                 HorizontalPager(
                     state = pagerState,
                     modifier = Modifier.weight(1f),
-                    userScrollEnabled = false // Desativa o deslizar com o dedo antes de responder
+                    userScrollEnabled = false
                 ) { page ->
                     val question = questions[page]
                     val hasAnswered = selectedAnswers.containsKey(page)
                     val selectedOption = selectedAnswers[page]
 
                     Column(modifier = Modifier.fillMaxSize()) {
-                        // Enunciado da Pergunta
                         Text(
                             text = question.text,
                             style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
@@ -157,20 +152,19 @@ fun PlayQuizScreen(
 
                         Spacer(modifier = Modifier.height(32.dp))
 
-                        // Lista de Alternativas
                         question.options.forEachIndexed { index, optionText ->
                             val isCorrectAnswer = index == question.correctAnswerIndex
                             val isSelected = index == selectedOption
 
-                            // Lógica de Cores baseada na imagem de referência
                             val cardColor = when {
-                                !hasAnswered -> Color.White // Padrão antes de responder
-                                isCorrectAnswer -> Color(0xFF4CAF50) // Verde se for a certa
-                                isSelected && !isCorrectAnswer -> Color(0xFFF44336) // Vermelho se errou
-                                else -> Color.White // As outras ficam brancas
+                                !hasAnswered -> Color.White
+                                isCorrectAnswer -> Color(0xFF4CAF50)
+                                isSelected && !isCorrectAnswer -> Color(0xFFF44336)
+                                else -> Color.White
                             }
 
-                            val textColor = if (hasAnswered && (isCorrectAnswer || isSelected)) Color.White else Color.Black
+                            val textColor =
+                                if (hasAnswered && (isCorrectAnswer || isSelected)) Color.White else Color.Black
 
                             Card(
                                 modifier = Modifier
@@ -178,20 +172,18 @@ fun PlayQuizScreen(
                                     .padding(vertical = 8.dp)
                                     .height(64.dp)
                                     .clickable(enabled = !hasAnswered) {
-                                        // Ao clicar: salva a resposta, calcula ponto e avança
                                         val newAnswers = selectedAnswers.toMutableMap()
                                         newAnswers[page] = index
                                         selectedAnswers = newAnswers
 
-                                        if (isCorrectAnswer) score += 10 // Dá 10 pontos por acerto
+                                        if (isCorrectAnswer) score += 10
 
-                                        // Avança para a próxima tela automaticamente após 1 segundo
                                         coroutineScope.launch {
                                             kotlinx.coroutines.delay(1000)
                                             if (page < questions.size - 1) {
                                                 pagerState.animateScrollToPage(page + 1)
                                             } else {
-                                                onQuizFinished(score) // Fim do Quiz!
+                                                onQuizFinished(score)
                                             }
                                         }
                                     },
@@ -213,12 +205,19 @@ fun PlayQuizScreen(
                                         color = textColor
                                     )
 
-                                    // Ícones de feedback (Verde/Vermelho)
                                     if (hasAnswered) {
                                         if (isCorrectAnswer) {
-                                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color.White)
+                                            Icon(
+                                                Icons.Default.CheckCircle,
+                                                contentDescription = null,
+                                                tint = Color.White
+                                            )
                                         } else if (isSelected) {
-                                            Icon(Icons.Default.Cancel, contentDescription = null, tint = Color.White)
+                                            Icon(
+                                                Icons.Default.Cancel,
+                                                contentDescription = null,
+                                                tint = Color.White
+                                            )
                                         }
                                     }
                                 }

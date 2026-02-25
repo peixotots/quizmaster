@@ -1,6 +1,5 @@
 package com.example.quizandroid.data.model
 
-// O "Envelope" do Quiz
 data class Quiz(
     val id: String = "",
     val title: String = "",
@@ -12,7 +11,6 @@ data class Quiz(
     val status: String = "ativo"
 )
 
-// A Pergunta pura para o banco de dados
 data class Question(
     val id: String = "",
     val quizId: String = "",
