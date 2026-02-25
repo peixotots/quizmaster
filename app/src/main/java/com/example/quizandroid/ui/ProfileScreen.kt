@@ -29,6 +29,7 @@ import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.AssignmentTurnedIn
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoCamera
@@ -45,6 +46,8 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -96,6 +99,15 @@ fun ProfileScreen(
     var userScoreState by remember { mutableIntStateOf(0) }
     var totalCorrectAnswers by remember { mutableIntStateOf(0) }
     var totalWrongAnswers by remember { mutableIntStateOf(0) }
+
+    var isBiometricEnabled by remember {
+        mutableStateOf(
+            offlineCofre.getBoolean(
+                "biometric_enabled",
+                false
+            )
+        )
+    }
 
     val userName =
         offlineCofre.getString("name_$uid", null) ?: userLocal?.name ?: userPrefs.getName()
@@ -413,6 +425,57 @@ fun ProfileScreen(
                 )
             }
 
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.Fingerprint,
+                            contentDescription = null,
+                            tint = Laranja,
+                            modifier = Modifier.size(28.dp)
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text(
+                                "Login por Biometria",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp
+                            )
+                            Text("Entrar sem digitar a senha", color = Color.Gray, fontSize = 12.sp)
+                        }
+                    }
+                    Switch(
+                        checked = isBiometricEnabled,
+                        onCheckedChange = { checked ->
+                            isBiometricEnabled = checked
+                            offlineCofre.edit().putBoolean("biometric_enabled", checked).apply()
+                            Toast.makeText(
+                                context,
+                                if (checked) "Biometria Ativada" else "Biometria Desativada",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = Laranja
+                        )
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.weight(1f))
 
             Button(
@@ -500,10 +563,12 @@ fun PerformanceDonutChart(done: Float, total: Float, modifier: Modifier) {
 @Composable
 fun LegendItem(color: Color, label: String, value: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(modifier = Modifier
-            .size(10.dp)
-            .clip(CircleShape)
-            .background(color))
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .clip(CircleShape)
+                .background(color)
+        )
         Spacer(modifier = Modifier.width(8.dp))
         Text(label, fontSize = 12.sp, color = Color.Gray, modifier = Modifier.width(90.dp))
         Text(value, fontSize = 14.sp, fontWeight = FontWeight.Bold)

@@ -2,6 +2,8 @@ package com.example.quizandroid.ui.login
 
 import android.content.Context
 import android.widget.Toast
+import androidx.biometric.BiometricPrompt
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,10 +14,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -27,11 +32,13 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,6 +54,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import com.example.quizandroid.R
 import com.example.quizandroid.data.model.UserPrefsManager
 import com.example.quizandroid.translateFirebaseError
@@ -59,17 +68,22 @@ fun LoginScreen(
     onLoginSuccess: () -> Unit,
     onNavigateToRegister: () -> Unit
 ) {
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("ranzatti@gmail.com") }
+    var password by remember { mutableStateOf("123456") }
     var isLoading by remember { mutableStateOf(false) }
     var passwordVisible by remember { mutableStateOf(false) }
 
     val auth = FirebaseAuth.getInstance()
     val db = FirebaseFirestore.getInstance()
     val context = LocalContext.current
+    val activity = context as? FragmentActivity
     val userPrefs = UserPrefsManager(context)
 
     val offlineCofre = context.getSharedPreferences("BypassOffline", Context.MODE_PRIVATE)
+
+    val isBiometricEnabled = offlineCofre.getBoolean("biometric_enabled", false)
+    val savedEmail = offlineCofre.getString("email", "") ?: ""
+    val savedPassword = offlineCofre.getString("password", "") ?: ""
 
     val isEmailValid = android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()
     val isPasswordValid = password.length >= 6
@@ -114,8 +128,6 @@ fun LoginScreen(
                                 }
                         }
                     } else {
-                        val savedEmail = offlineCofre.getString("email", "")
-                        val savedPassword = offlineCofre.getString("password", "")
                         val savedUid = offlineCofre.getString("uid", "")
                         val savedName = offlineCofre.getString("name", "Jogador")
 
@@ -135,6 +147,44 @@ fun LoginScreen(
                         }
                     }
                 }
+        }
+    }
+
+    val triggerBiometricLogin = {
+        if (activity != null && savedEmail.isNotEmpty() && savedPassword.isNotEmpty()) {
+            val executor = ContextCompat.getMainExecutor(activity)
+            val biometricPrompt = BiometricPrompt(
+                activity, executor,
+                object : BiometricPrompt.AuthenticationCallback() {
+                    override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                        super.onAuthenticationSucceeded(result)
+                        email = savedEmail
+                        password = savedPassword
+                        performLogin()
+                    }
+                })
+
+            val promptInfo = BiometricPrompt.PromptInfo.Builder()
+                .setTitle("Login Biométrico")
+                .setSubtitle("Use sua digital ou rosto para entrar")
+                .setNegativeButtonText("Usar Senha")
+                .build()
+
+            biometricPrompt.authenticate(promptInfo)
+        } else {
+            Toast.makeText(
+                context,
+                "Faça login com sua senha uma vez para usar a biometria.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    var hasPrompted by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (isBiometricEnabled && !hasPrompted && savedEmail.isNotEmpty() && savedPassword.isNotEmpty()) {
+            hasPrompted = true
+            triggerBiometricLogin()
         }
     }
 
@@ -217,13 +267,7 @@ fun LoginScreen(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    leadingIcon = {
-                        Icon(
-                            Icons.Default.Lock,
-                            null,
-                            tint = Laranja
-                        )
-                    },
+                    leadingIcon = { Icon(Icons.Default.Lock, null, tint = Laranja) },
                     trailingIcon = {
                         val image =
                             if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
@@ -241,13 +285,10 @@ fun LoginScreen(
                     )
                 )
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = { handleResetPassword() }) {
                         Text(
-                            text = "Esqueci minha senha",
+                            "Esqueci minha senha",
                             color = Color.Gray,
                             style = MaterialTheme.typography.bodySmall
                         )
@@ -274,11 +315,32 @@ fun LoginScreen(
                         Text("ENTRAR", fontWeight = FontWeight.Bold)
                     }
 
+                    if (isBiometricEnabled && savedEmail.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedButton(
+                            onClick = { triggerBiometricLogin() },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Laranja),
+                            border = BorderStroke(1.dp, Laranja)
+                        ) {
+                            Icon(
+                                Icons.Default.Fingerprint,
+                                contentDescription = "Biometria",
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("ENTRAR COM BIOMETRIA", fontWeight = FontWeight.Bold)
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(16.dp))
 
                     TextButton(onClick = onNavigateToRegister) {
                         Text(
-                            text = "Não tem uma conta? Cadastre-se",
+                            "Não tem uma conta? Cadastre-se",
                             color = Laranja,
                             fontWeight = FontWeight.SemiBold
                         )
