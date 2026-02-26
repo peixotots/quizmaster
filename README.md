@@ -247,11 +247,9 @@ quizmaster/
 
 ---
 
-## 🚧 Principais Desafios Técnicos
+## 🚧 Principais Dificuldades Encontradas
 
-Durante o desenvolvimento deste projeto, enfrentamos diversos desafios técnicos importantes:
-
-### **Desafio 1️⃣: Sincronização Offline e Integração de Dois Bancos**
+### **Desafio 1️⃣: Sincronização offline e integração de dois bancos**
 **Descrição do Problema:**
 O maior desafio foi implementar um sistema robusto de **armazenamento offline** que funcionasse em harmonia com o banco de dados na nuvem (Firebase Firestore). Precisávamos garantir que:
 - Os dados fossem salvos localmente (Room) para acesso offline
@@ -306,9 +304,7 @@ dbRemote.collection("quizzes")
 **Resultado:**
 O aplicativo agora funciona 100% offline após o primeiro login, com sincronização automática quando a conexão retorna.
 
----
-
-### **Desafio 2️⃣: Garantir Consistência de Dados**
+### **Desafio 2️⃣: Garantir consistência de dados**
 
 **Problema:**
 Quando um usuário completa um quiz offline, como garantir que a pontuação seja salva corretamente e sincronizada depois?
